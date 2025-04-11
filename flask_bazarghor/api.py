@@ -1,7 +1,9 @@
 from flask import Flask, request, jsonify
 import mysql.connector
+from flask_ngrok import run_with_ngrok
 
 app = Flask(__name__)
+run_with_ngrok(app)
 
 # MySQL (TiDB) config
 config = {
@@ -15,6 +17,27 @@ config = {
 
 def get_db():
     return mysql.connector.connect(**config)
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM users WHERE email = %s AND password = %s", (email, password))
+        user = cursor.fetchone()
+        if user:
+            return jsonify({"message": "Login successful", "user": user}), 200
+        else:
+            return jsonify({"message": "Invalid credentials"}), 401
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
 
 # ------------------- CREATE USER -------------------
 @app.route('/users', methods=['POST'])
@@ -57,4 +80,4 @@ def get_users():
         db.close()
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
